@@ -21,34 +21,25 @@ STATE = 1
 
 WAITING = 0
 WORKING = 1
-INTERLOCKED = 2
 
-#NOT_DONE = False
-#DONE = True
+NOT_DONE = False
+DONE = True
 
 steps = 0
 
 class Op:
     
-    def __init__(self, name, prereqs=None, duration=0):
+    def __init__(self, name, prereqs=None, duration=0, initial=False):
         self.name = name
         if prereqs is None:
             prereqs = []
         self.prereqs = prereqs
+        self.prereqSignals = {prereq: initial for prereq in self.prereqs}
         self.duration = duration
         self.postOps = []
         self.subOps = []
-        self._state = WAITING
-        
-    @property
-    def state(self):
-        if self._state == WORKING:
-            return WORKING
-        if any(prereq._state == WORKING for prereq in self.prereqs):
-            self._state = INTERLOCKED
-        else:
-            self._state = WAITING
-        return self._state
+        self.state = WAITING
+
     
     def setPrereqs(self):
         self.prereqs = [ops[prereq] for prereq in self.prereqs]
@@ -56,32 +47,31 @@ class Op:
             op.postOps.append(self)
         
     def prereqsComplete(self):
-        return all(prereq.state!=WORKING for prereq in self.prereqs)
+        return all(status == DONE for status in self.prereqSignals.values())
     
     def startOp(self, startTime):
-#        print('Op:', self)
-#        print('Pre:', self.prereqs)
-#        print('States:', [op.state for op in self.prereqs])
         if self.prereqsComplete():
-#            print('Op:', self)
-            self._state = WORKING
+            self.state = WORKING
             if self.subOps:
                 return self.runSubOps(startTime)
             return self.duration + startTime
         return -1
 
     def finishOp(self):
-        self._state = WAITING
-        return self.postOps # + self.subOps
+        self.state = WAITING
+        for op in self.postOps:
+            op.prereqSignals[self] = DONE
+        self.prereqSignals = {preop: NOT_DONE for preop in self.prereqs}
+        return self.postOps
     
-    def runSubOps(self, currTime):
+    def runSubOps(self, startTime):
         global steps
         steps += 1
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
         for op in self.subOps:
-            endTime = op.startOp(currTime)
+            endTime = op.startOp(startTime)
             if endTime >= 0:
                 events.put(Event(endTime, op))
 #                print('Put event:', Event(endTime, op))
@@ -106,20 +96,29 @@ class Op:
             if initialState == currState:
                 break 
         
-        print('Cycle time:', currTime)
+        print('{} cycle time:'.format(self.name), currTime-startTime)
         return currTime
+    
+    def __hash__(self):
+        return hash(self.name)
+    
+    def __str__(self):
+        return self.name
+    
+    def __eq__(self, other):
+        return str(self) == str(other)
     
     def __repr__(self):
         return 'Op({})'.format(self.name)
 
-mainOP = Op('Main')    
-indexOP = Op('Index', ['Print', 'Rotate'], 0.25)
+mainOP = Op('Main', initial=True)    
+indexOP = Op('Index', ['Print', 'Rotate'], 0.25, initial=True)
 printOP = Op('Print', ['Index'], 0.75)
 rotateOP = Op('Rotate', ['Index'], 0)
 
-rDownOP = Op('rDown', [], 0.25)
+rDownOP = Op('rDown', [], 0.25, initial=True)
 rRotateOP = Op('rRotate', ['rDown'], 1)
-rUpOP = Op('rUp', ['rRotate'], 0.3)
+rUpOP = Op('rUp', ['rRotate'], 0.4)
 
 rotateOP.subOps = [rDownOP, rRotateOP, rUpOP]
 
