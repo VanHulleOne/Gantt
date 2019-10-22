@@ -74,25 +74,23 @@ class Op:
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
-        for opName in self.subOps:
-            op = opsDict[opName]
+        for op in self.subOps:
             endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op, endTime-startTime))
-        initialState = tuple(opsDict[opName].state for opName in self.subOps)
+        initialState = tuple(op.state for op in self.subOps)
 
         while not events.empty():
             currEvent = events.get()
             self.eventList.append(currEvent)
             currTime = currEvent.endTime
-            for opName in currEvent.op.finishOp():
-                op = opsDict[opName]
+            for op in currEvent.op.finishOp():
                 endTime = op.startOp(currTime)
                 if endTime >= 0:
                     newEvent = Event(endTime, op, endTime-currTime)
                     events.put(newEvent)
                     
-            currState = tuple(opsDict[opName].state for opName in self.subOps)
+            currState = tuple(op.state for op in self.subOps)
             if initialState == currState:
                 break 
             
@@ -121,13 +119,14 @@ masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate']),
 
 opsDict = {op.name:op for op in masterOpList}
 
-def setPostOps():
+def setOps():
     for op in masterOpList:
-        for opName in op.prereqs:
-            preOp = opsDict[opName]
+        op.prereqs = [opsDict[opName] for opName in op.prereqs]
+        op.subOps = [opsDict[opName] for opName in op.subOps]
+        for preOp in op.prereqs:
             preOp.postOps.append(op)
 
-setPostOps()
+setOps()
 
 opsDict['Main'].startOp(0)
 opsDict['Main'].eventPrint()
