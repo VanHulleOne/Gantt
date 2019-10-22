@@ -29,7 +29,7 @@ steps = 0
 
 class Op:
     
-    def __init__(self, name, prereqs=None, duration=0, initial=False):
+    def __init__(self, name, prereqs=None, duration=0, *args, subOps=None, initial=False):
         self.name = name
         if prereqs is None:
             prereqs = []
@@ -37,15 +37,17 @@ class Op:
         self.prereqSignals = {prereq: initial for prereq in self.prereqs}
         self.duration = duration
         self.postOps = []
-        self.subOps = []
+        if subOps is None:
+            subOps = []
+        self.subOps = subOps
         self.initial = initial
         self.state = WAITING
         self.eventList = []
 
     
-    def setPrereqs(self):
-        self.prereqs = [ops[prereq] for prereq in self.prereqs]
-        for op in self.prereqs:
+    def setPostOps(self):
+        for opName in self.prereqs:
+            op = opsDict[opName]
             op.postOps.append(self)
         
     def prereqsComplete(self):
@@ -78,23 +80,25 @@ class Op:
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
-        for op in self.subOps:
+        for opName in self.subOps:
+            op = opsDict[opName]
             endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op, endTime-startTime))
-        initialState = tuple(op.state for op in self.subOps)
+        initialState = tuple(opsDict[opName].state for opName in self.subOps)
 
         while not events.empty():
             currEvent = events.get()
             self.eventList.append(currEvent)
             currTime = currEvent.endTime
-            for op in currEvent.op.finishOp():
+            for opName in currEvent.op.finishOp():
+                op = opsDict[opName]
                 endTime = op.startOp(currTime)
                 if endTime >= 0:
                     newEvent = Event(endTime, op, endTime-currTime)
                     events.put(newEvent)
                     
-            currState = tuple(op.state for op in self.subOps)
+            currState = tuple(opsDict[opName].state for opName in self.subOps)
             if initialState == currState:
                 break 
             
@@ -112,33 +116,36 @@ class Op:
     def __repr__(self):
         return 'Op({})'.format(self.name)
 
-mainOP = Op('Main')    
-indexOP = Op('Index', ['Print', 'Rotate'], 0.25, initial=True)
-printOP = Op('Print', ['Index'], 0.75)
-rotateOP = Op('Rotate', ['Index'], 0)
+masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate']),
+                Op('Index', ['Print', 'Rotate'], 0.25, initial=True),
+                Op('Print', ['Index'], 2.75),
+                Op('Rotate', ['Index'], 0, subOps=['rDown', 'rRotate', 'rUp']),
+                Op('rDown', [], 0.25),
+                Op('rRotate', ['rDown'], 1),
+                Op('rUp', ['rRotate'], 0.4),
+                ]
 
-rDownOP = Op('rDown', [], 0.25)
-rRotateOP = Op('rRotate', ['rDown'], 1)
-rUpOP = Op('rUp', ['rRotate'], 0.4)
+opsDict = {op.name:op for op in masterOpList}
+for op in masterOpList:
+    op.setPostOps()
+#rotateOP.subOps = [rDownOP, rRotateOP, rUpOP]
+#
+#
+#mainOP.subOps = [indexOP, printOP, rotateOP]
+#
+#ops = {'Index': indexOP,
+#       'Print': printOP,
+#       'Rotate': rotateOP,
+#       'rDown': rDownOP,
+#       'rRotate': rRotateOP,
+#       'rUp': rUpOP,
+#       }
+#
+#for op in ops.values():
+#    op.setPrereqs()
 
-rotateOP.subOps = [rDownOP, rRotateOP, rUpOP]
-
-
-mainOP.subOps = [indexOP, printOP, rotateOP]
-
-ops = {'Index': indexOP,
-       'Print': printOP,
-       'Rotate': rotateOP,
-       'rDown': rDownOP,
-       'rRotate': rRotateOP,
-       'rUp': rUpOP,
-       }
-
-for op in ops.values():
-    op.setPrereqs()
-
-mainOP.startOp(0)
-mainOP.eventPrint()
+opsDict['Main'].startOp(0)
+opsDict['Main'].eventPrint()
 
 
 
