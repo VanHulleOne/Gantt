@@ -1,0 +1,17 @@
+Index	0.25	RotateTube, Print, PickTube
+Rotate Tube	?	Index
+	Approach	0.25
+	Rotate	1	Approach
+	Retract	0.25	Rotate
+Print	1	Index
+PickTube	?	Index, PlaceTubes
+	Approach	0.25
+	Grab	0.25	Approach
+	Retract	0.25	Grab
+PlaceTubes	?	PickTube*3
+	Left	1.5
+	DropTubes	?	Left
+		Approach	0.7
+		Release	0.25	Approach
+		Retract	0.7	Release
+	Right	1.5	DropTubes
