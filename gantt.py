@@ -38,6 +38,7 @@ class Op:
         self.duration = duration
         self.postOps = []
         self.subOps = []
+        self.initial = initial
         self.state = WAITING
 
     
@@ -65,16 +66,15 @@ class Op:
         return self.postOps
     
     def runSubOps(self, startTime):
-        global steps
-        steps += 1
+        eventList = []
+        currTime = startTime
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
         for op in self.subOps:
-            endTime = op.startOp(startTime)
+            endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op))
-#                print('Put event:', Event(endTime, op))
         initialState = tuple(op.state for op in self.subOps)
         
         numLoops = 0
@@ -84,6 +84,7 @@ class Op:
                 break
             numLoops += 1
             currEvent = events.get()
+            eventList.append(currEvent)
             print(currEvent)
             currTime = currEvent.endTime
             for op in currEvent.op.finishOp():
@@ -97,7 +98,7 @@ class Op:
                 break 
         
         print('{} cycle time:'.format(self.name), currTime-startTime)
-        return currTime
+        return currTime#, eventList
     
     def __hash__(self):
         return hash(self.name)
@@ -111,12 +112,12 @@ class Op:
     def __repr__(self):
         return 'Op({})'.format(self.name)
 
-mainOP = Op('Main', initial=True)    
+mainOP = Op('Main')    
 indexOP = Op('Index', ['Print', 'Rotate'], 0.25, initial=True)
 printOP = Op('Print', ['Index'], 0.75)
 rotateOP = Op('Rotate', ['Index'], 0)
 
-rDownOP = Op('rDown', [], 0.25, initial=True)
+rDownOP = Op('rDown', [], 0.25)
 rRotateOP = Op('rRotate', ['rDown'], 1)
 rUpOP = Op('rUp', ['rRotate'], 0.4)
 
