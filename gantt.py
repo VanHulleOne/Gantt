@@ -40,6 +40,7 @@ class Op:
         self.subOps = []
         self.initial = initial
         self.state = WAITING
+        self.eventList = []
 
     
     def setPrereqs(self):
@@ -50,13 +51,16 @@ class Op:
     def prereqsComplete(self):
         return all(status == DONE for status in self.prereqSignals.values())
     
-    def startOp(self, startTime):
+    def startOp(self, startTime, level=0):
         if self.prereqsComplete():
             self.state = WORKING
             if self.subOps:
-                return self.runSubOps(startTime)
-            return self.duration + startTime
-        return -1
+                endTime, eventList = self.runSubOps(startTime, level+1)
+#                for event in eventList:
+#                    print('\t'*level, event)
+                return endTime, eventList
+            return self.duration + startTime, [self]
+        return -1, None
 
     def finishOp(self):
         self.state = WAITING
@@ -65,14 +69,18 @@ class Op:
         self.prereqSignals = {preop: NOT_DONE for preop in self.prereqs}
         return self.postOps
     
-    def runSubOps(self, startTime):
-        eventList = []
+    def eventPrint(self, level=0):
+        for event in self.eventList:
+            print('  '*level, event)
+            event.op.eventPrint(level+1)
+    
+    def runSubOps(self, startTime, level):
         currTime = startTime
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
         for op in self.subOps:
-            endTime = op.startOp(currTime)
+            endTime, _ = op.startOp(currTime, level)
             if endTime >= 0:
                 events.put(Event(endTime, op))
         initialState = tuple(op.state for op in self.subOps)
@@ -84,11 +92,11 @@ class Op:
                 break
             numLoops += 1
             currEvent = events.get()
-            eventList.append(currEvent)
-            print(currEvent)
+            self.eventList.append(currEvent)
+#            print(currEvent)
             currTime = currEvent.endTime
             for op in currEvent.op.finishOp():
-                endTime = op.startOp(currTime)
+                endTime, _ = op.startOp(currTime, level)
                 if endTime >= 0:
                     newEvent = Event(endTime, op)
                     events.put(newEvent)
@@ -97,8 +105,8 @@ class Op:
             if initialState == currState:
                 break 
         
-        print('{} cycle time:'.format(self.name), currTime-startTime)
-        return currTime#, eventList
+#        print('{} cycle time:'.format(self.name), currTime-startTime)
+        return currTime, self.eventList
     
     def __hash__(self):
         return hash(self.name)
@@ -137,9 +145,8 @@ ops = {'Index': indexOP,
 for op in ops.values():
     op.setPrereqs()
 
-
 mainOP.startOp(0)
-
+mainOP.eventPrint()
 
 
 
