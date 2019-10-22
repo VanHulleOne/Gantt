@@ -43,12 +43,6 @@ class Op:
         self.initial = initial
         self.state = WAITING
         self.eventList = []
-
-    
-    def setPostOps(self):
-        for opName in self.prereqs:
-            op = opsDict[opName]
-            op.postOps.append(self)
         
     def prereqsComplete(self):
         return all(status == DONE for status in self.prereqSignals.values())
@@ -126,23 +120,14 @@ masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate']),
                 ]
 
 opsDict = {op.name:op for op in masterOpList}
-for op in masterOpList:
-    op.setPostOps()
-#rotateOP.subOps = [rDownOP, rRotateOP, rUpOP]
-#
-#
-#mainOP.subOps = [indexOP, printOP, rotateOP]
-#
-#ops = {'Index': indexOP,
-#       'Print': printOP,
-#       'Rotate': rotateOP,
-#       'rDown': rDownOP,
-#       'rRotate': rRotateOP,
-#       'rUp': rUpOP,
-#       }
-#
-#for op in ops.values():
-#    op.setPrereqs()
+
+def setPostOps():
+    for op in masterOpList:
+        for opName in op.prereqs:
+            preOp = opsDict[opName]
+            preOp.postOps.append(op)
+
+setPostOps()
 
 opsDict['Main'].startOp(0)
 opsDict['Main'].eventPrint()
