@@ -51,16 +51,13 @@ class Op:
     def prereqsComplete(self):
         return all(status == DONE for status in self.prereqSignals.values())
     
-    def startOp(self, startTime, level=0):
+    def startOp(self, startTime):
         if self.prereqsComplete():
             self.state = WORKING
             if self.subOps:
-                endTime, eventList = self.runSubOps(startTime, level+1)
-#                for event in eventList:
-#                    print('\t'*level, event)
-                return endTime, eventList
-            return self.duration + startTime, [self]
-        return -1, None
+                return self.runSubOps(startTime)
+            return self.duration + startTime
+        return -1
 
     def finishOp(self):
         self.state = WAITING
@@ -74,13 +71,13 @@ class Op:
             print('  '*level, event)
             event.op.eventPrint(level+1)
     
-    def runSubOps(self, startTime, level):
+    def runSubOps(self, startTime):
         currTime = startTime
         if steps > 6:
             raise Exception()
         events = PriorityQueue()
         for op in self.subOps:
-            endTime, _ = op.startOp(currTime, level)
+            endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op))
         initialState = tuple(op.state for op in self.subOps)
@@ -96,7 +93,7 @@ class Op:
 #            print(currEvent)
             currTime = currEvent.endTime
             for op in currEvent.op.finishOp():
-                endTime, _ = op.startOp(currTime, level)
+                endTime = op.startOp(currTime)
                 if endTime >= 0:
                     newEvent = Event(endTime, op)
                     events.put(newEvent)
@@ -106,7 +103,7 @@ class Op:
                 break 
         
 #        print('{} cycle time:'.format(self.name), currTime-startTime)
-        return currTime, self.eventList
+        return currTime
     
     def __hash__(self):
         return hash(self.name)
