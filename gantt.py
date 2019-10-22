@@ -12,7 +12,7 @@ from collections import namedtuple
 
 #PreReq = namedtuple('PreReq', 'op state')
 
-Event = namedtuple('Event', 'endTime op')
+Event = namedtuple('Event', 'endTime op cycleTime')
 
 #events = PriorityQueue()
 
@@ -67,6 +67,8 @@ class Op:
         return self.postOps
     
     def eventPrint(self, level=0):
+        if level == 0:
+            print(self.name, 'Cycle Time: {:0.2f}'.format(self.eventList[-1].endTime))
         for event in self.eventList:
             print('  '*level, event)
             event.op.eventPrint(level+1)
@@ -79,30 +81,23 @@ class Op:
         for op in self.subOps:
             endTime = op.startOp(currTime)
             if endTime >= 0:
-                events.put(Event(endTime, op))
+                events.put(Event(endTime, op, endTime-startTime))
         initialState = tuple(op.state for op in self.subOps)
-        
-        numLoops = 0
-        
+
         while not events.empty():
-            if numLoops > 6:
-                break
-            numLoops += 1
             currEvent = events.get()
             self.eventList.append(currEvent)
-#            print(currEvent)
             currTime = currEvent.endTime
             for op in currEvent.op.finishOp():
                 endTime = op.startOp(currTime)
                 if endTime >= 0:
-                    newEvent = Event(endTime, op)
+                    newEvent = Event(endTime, op, endTime-currTime)
                     events.put(newEvent)
                     
             currState = tuple(op.state for op in self.subOps)
             if initialState == currState:
                 break 
-        
-#        print('{} cycle time:'.format(self.name), currTime-startTime)
+            
         return currTime
     
     def __hash__(self):
