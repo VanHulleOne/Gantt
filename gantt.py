@@ -8,7 +8,7 @@ gantt.py
 """
 
 from queue import PriorityQueue
-from collections import namedtuple
+from collections import namedtuple, Counter
 
 #PreReq = namedtuple('PreReq', 'op state')
 
@@ -33,8 +33,9 @@ class Op:
         self.name = name
         if prereqs is None:
             prereqs = []
-        self.prereqs = prereqs
-        self.prereqSignals = {prereq: initial for prereq in self.prereqs}
+        self.prereqs = Counter(prereqs)
+        
+        self.prereqCounts = Counter(prereqs if initial else None) # {prereq: initial for prereq in self.prereqs}
         self.duration = duration
         self.postOps = []
         if subOps is None:
@@ -45,7 +46,8 @@ class Op:
         self.eventList = []
         
     def prereqsComplete(self):
-        return all(status == DONE for status in self.prereqSignals.values())
+        return not bool(self.prereqs - self.prereqCounts)
+#        return all(status == DONE for status in self.prereqSignals.values())
     
     def startOp(self, startTime):
         if self.prereqsComplete():
@@ -58,8 +60,8 @@ class Op:
     def finishOp(self):
         self.state = WAITING
         for op in self.postOps:
-            op.prereqSignals[self] = DONE
-        self.prereqSignals = {preop: NOT_DONE for preop in self.prereqs}
+            op.prereqCounts[self] += 1
+        self.prereqCounts = Counter()
         return self.postOps
     
     def eventPrint(self, level=0):
@@ -70,17 +72,23 @@ class Op:
             event.op.eventPrint(level+1)
     
     def runSubOps(self, startTime):
+        print('Op:', self.name)
         currTime = startTime
-        if steps > 6:
-            raise Exception()
+#        if steps > 6:
+#            raise Exception()
         events = PriorityQueue()
         for op in self.subOps:
             endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op, endTime-startTime))
-        initialState = tuple(op.state for op in self.subOps)
+        initialState = tuple(Counter(op.prereqCounts.elements()) for op in self.subOps)
+        
+        print('Ini:', initialState)
 
-        while not events.empty():
+        steps = 0
+        while not events.empty() and steps <7:
+            print('Step:', steps)
+            steps += 1
             currEvent = events.get()
             self.eventList.append(currEvent)
             currTime = currEvent.endTime
@@ -90,8 +98,10 @@ class Op:
                     newEvent = Event(endTime, op, endTime-currTime)
                     events.put(newEvent)
                     
-            currState = tuple(op.state for op in self.subOps)
+            currState = tuple(Counter(op.prereqCounts.elements()) for op in self.subOps)
+            print('Op:', self.name, 'Curr:', currState, 'Bool:', initialState == currState)
             if initialState == currState:
+                print('Break')
                 break 
             
         return currTime
@@ -115,15 +125,20 @@ masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate']),
                 Op('rDown', [], 0.25),
                 Op('rRotate', ['rDown'], 1),
                 Op('rUp', ['rRotate'], 0.4),
+                Op('PickTube', ['Index', 'PlaceTubes'], subOps='pApproach pGrab pRetract'.split()),
+                Op('pApproach', [], 0.25),
+                Op('pGrab', ['pApproach'], 0.25),
+                Op('pRetract', ['pGrab'], 0.25),
+                Op('PlaceTubes', {'PickTube':3}, 3.4),
                 ]
 
 opsDict = {op.name:op for op in masterOpList}
 
 def setOps():
     for op in masterOpList:
-        op.prereqs = [opsDict[opName] for opName in op.prereqs]
+        op.prereqs = Counter({opsDict[opName]: qty for opName, qty in op.prereqs.items()})
         op.subOps = [opsDict[opName] for opName in op.subOps]
-        for preOp in op.prereqs:
+        for preOp in op.prereqs.keys():
             preOp.postOps.append(op)
 
 setOps()
