@@ -59,8 +59,8 @@ class Op:
 
     def finishOp(self):
         self.state = WAITING
-        for op in self.postOps:
-            op.prereqCounts[self] += 1
+        for postOp in self.postOps:
+            postOp.prereqCounts[self] += 1
         self.prereqCounts = Counter()
         return self.postOps
     
@@ -81,12 +81,12 @@ class Op:
             endTime = op.startOp(currTime)
             if endTime >= 0:
                 events.put(Event(endTime, op, endTime-startTime))
-        initialState = tuple(Counter(op.prereqCounts.elements()) for op in self.subOps)
+        initialState = tuple((op.name, Counter(op.prereqCounts.elements())) for op in self.subOps)
         
         print('Ini:', initialState)
 
         steps = 0
-        while not events.empty() and steps <7:
+        while not events.empty() and steps <12:
             print('Step:', steps)
             steps += 1
             currEvent = events.get()
@@ -98,7 +98,7 @@ class Op:
                     newEvent = Event(endTime, op, endTime-currTime)
                     events.put(newEvent)
                     
-            currState = tuple(Counter(op.prereqCounts.elements()) for op in self.subOps)
+            currState = tuple((op.name, Counter(op.prereqCounts.elements())) for op in self.subOps)
             print('Op:', self.name, 'Curr:', currState, 'Bool:', initialState == currState)
             if initialState == currState:
                 print('Break')
@@ -118,7 +118,7 @@ class Op:
     def __repr__(self):
         return 'Op({})'.format(self.name)
 
-masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate']),
+masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate', 'PlaceTubes']),
                 Op('Index', ['Print', 'Rotate'], 0.25, initial=True),
                 Op('Print', ['Index'], 2.75),
                 Op('Rotate', ['Index'], 0, subOps=['rDown', 'rRotate', 'rUp']),
@@ -142,6 +142,8 @@ def setOps():
             preOp.postOps.append(op)
 
 setOps()
+
+opsDict['PickTube'].prereqCounts = Counter({'PlaceTubes':1})
 
 opsDict['Main'].startOp(0)
 opsDict['Main'].eventPrint()
