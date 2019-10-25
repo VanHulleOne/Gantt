@@ -46,6 +46,8 @@ class Op:
         self.eventList = []
         
     def prereqsComplete(self):
+        if any(prereq.state != WAITING for prereq in self.prereqs):
+            return False
         return not bool(self.prereqs - self.prereqCounts)
 #        return all(status == DONE for status in self.prereqSignals.values())
     
@@ -66,10 +68,14 @@ class Op:
     
     def eventPrint(self, level=0):
         if level == 0:
-            print(self.name, 'Cycle Time: {:0.2f}'.format(self.eventList[-1].endTime))
-        for event in self.eventList:
-            print('  '*level, event)
-            event.op.eventPrint(level+1)
+            print(self.name, 'Cycle Time: {:0.2f}'.format(self.eventList[-1][-1].endTime))
+        try:
+            events = self.eventList.pop(0)
+            for event in events:
+                print('  '*level, event)
+                event.op.eventPrint(level+1)
+        except:
+            pass
     
     def runSubOps(self, startTime):
         print('Op:', self.name)
@@ -77,6 +83,7 @@ class Op:
 #        if steps > 6:
 #            raise Exception()
         events = PriorityQueue()
+        localEvents = []
         for op in self.subOps:
             endTime = op.startOp(currTime)
             if endTime >= 0:
@@ -86,11 +93,11 @@ class Op:
         print('Ini:', initialState)
 
         steps = 0
-        while not events.empty() and steps <12:
+        while not events.empty() and steps <30:
             print('Step:', steps)
             steps += 1
             currEvent = events.get()
-            self.eventList.append(currEvent)
+            localEvents.append(currEvent)
             currTime = currEvent.endTime
             for op in currEvent.op.finishOp():
                 endTime = op.startOp(currTime)
@@ -103,7 +110,7 @@ class Op:
             if initialState == currState:
                 print('Break')
                 break 
-            
+        self.eventList.append(localEvents)    
         return currTime
     
     def __hash__(self):
@@ -125,7 +132,7 @@ masterOpList = [Op('Main', subOps=['Index', 'Print', 'Rotate', 'PlaceTubes']),
                 Op('rDown', [], 0.25),
                 Op('rRotate', ['rDown'], 1),
                 Op('rUp', ['rRotate'], 0.4),
-                Op('PickTube', ['Index', 'PlaceTubes'], subOps='pApproach pGrab pRetract'.split()),
+                Op('PickTube', {'Index':1, 'PlaceTubes':0}, subOps='pApproach pGrab pRetract'.split()),
                 Op('pApproach', [], 0.25),
                 Op('pGrab', ['pApproach'], 0.25),
                 Op('pRetract', ['pGrab'], 0.25),
