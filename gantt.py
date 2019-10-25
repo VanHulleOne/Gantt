@@ -35,6 +35,7 @@ class Op:
             prereqs = []
         self.prereqs = Counter(prereqs)
         
+        self.initial = initial
         self.prereqCounts = Counter(prereqs if initial else None) # {prereq: initial for prereq in self.prereqs}
         self.duration = duration
         self.postOps = []
@@ -46,6 +47,9 @@ class Op:
         self.eventList = []
         
     def prereqsComplete(self):
+        if self.initial:
+            self.initial = False
+            return True
         if any(prereq.state != WAITING for prereq in self.prereqs):
             return False
         return not bool(self.prereqs - self.prereqCounts)
